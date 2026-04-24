@@ -55,3 +55,4 @@ era5_clean <- era5_clean |>
 
 # Save data -------
 save(era5_clean, file=paste0(output, "ERA5_climate_2011_2024", ".RData"))
+

@@ -50,3 +50,8 @@ rsconnect/
 
 # Files
 Notes.txt
+
+# Size files 
+2-Data/Output/Daily_FD_CLIM_2011_2024.RData
+2-Data/Output/Longitudinal_FD_CLIM_2011_2024.RData
+2-Data/Output/Weekly_FD_CLIM_2011_2024.RData

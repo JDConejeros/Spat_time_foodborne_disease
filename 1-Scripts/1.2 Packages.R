@@ -15,7 +15,7 @@ install_load <- function(packages){
 # Grouped by purpose, then passed to install_load
 pkgs_io <- c(
   "rio",   # import/export (many formats)
-  "readr"  # fast read/write for delimited text
+  "readr" # fast read/write for delimited text
 )
 
 pkgs_wrangle <- c(
@@ -74,3 +74,4 @@ install_load(c(
   pkgs_spatial, 
   pkgs_workflow
 ))
+
