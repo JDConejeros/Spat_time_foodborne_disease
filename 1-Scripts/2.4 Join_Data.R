@@ -190,16 +190,6 @@ glimpse(data)
 
 # .RData: legacy. .qs (zstd) and .rds (xz) are usually smaller: qs::qread() / readRDS()
 save(data, file = paste0(output, "Daily_FD_CLIM_2011_2024", ".RData"))
-qs::qsave(
-  data,
-  file = paste0(output, "Daily_FD_CLIM_2011_2024", ".qs"),
-  preset = "archive"
-)
-saveRDS(
-  data,
-  file = paste0(output, "Daily_FD_CLIM_2011_2024", ".rds"),
-  compress = "xz"
-)
 
 ############################################################################################################################/
 # 2.4.3 Longitudinal panels (year, semester, month, epiweek) -------------------------
@@ -498,7 +488,7 @@ mutate_clim_zone <- function(df) {
     )
 }
 
-## By year -----------------------------------------------------------------------
+## By year ----------
 g_year <- c(geo_base, "year")
 data_year <- aggregate_panel(d_nosf, d_clim_day, g_year) |>
   mutate_clim_zone() |>
@@ -513,7 +503,7 @@ data_year <- aggregate_panel(d_nosf, d_clim_day, g_year) |>
   sf::st_as_sf()
 glimpse(data_year)
 
-## By semester ------------------------------------------------------------------
+## By semester ---------
 g_sem <- c(geo_base, "year", "semester")
 data_semester <- aggregate_panel(d_nosf, d_clim_day, g_sem) |>
   mutate_clim_zone() |>
@@ -521,7 +511,7 @@ data_semester <- aggregate_panel(d_nosf, d_clim_day, g_sem) |>
   sf::st_as_sf()
 glimpse(data_semester)
 
-## By calendar month ----------------------------------------------------------
+## By calendar month -----------
 g_month <- c(geo_base, "year", "month_num")
 data_month <- aggregate_panel(d_nosf, d_clim_day, g_month) |>
   dplyr::mutate(month_date = lubridate::make_date(year, month_num, 1L)) |>
@@ -530,7 +520,7 @@ data_month <- aggregate_panel(d_nosf, d_clim_day, g_month) |>
   sf::st_as_sf()
 glimpse(data_month)
 
-## By epidemiological week (epiweek, ISO week starting Monday) + rates ------------------------
+## By epidemiological week (epiweek, ISO week starting Monday) + rates ------
 g_week <- c(geo_base, "epiweek")
 data_w <- aggregate_panel(d_nosf, d_clim_day, g_week) |>
   dplyr::mutate(
@@ -544,7 +534,10 @@ data_w <- aggregate_panel(d_nosf, d_clim_day, g_week) |>
 
 glimpse(data_w)
 
-## Save ----------------------------------------------------------------------
+
+############################################################################################################################/
+# 2.4.4 Save Data ----------------------------------------------------------------
+############################################################################################################################/
 
 # Longitudinal: four objects in one file; .qs / .rds = named list (same element names)
 longitudinal_bundle <- list(
