@@ -1,4 +1,4 @@
-# 1.0 Process data Foodborne diseases data -----
+# 2.1 Process Foodborne diseases data -----
 
 # Load settings
 source("1-Scripts/1.1 Settings.R")
@@ -11,7 +11,7 @@ input <- "2-Data/Input/"
 output <- "2-Data/Output/"
 
 ############################################################################################################################/
-# 1.1 Population Data ----------------------------------------------------------------
+# 2.1.1 Population Data ----------------------------------------------------------------
 ############################################################################################################################/
 
 labs_mes <- c("Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre")
@@ -20,7 +20,7 @@ labs_reg <- c("Arica y Parinacota", "Tarapacá", "Antofagasta", "Atacama", "Coqu
               "Biobío", "La Araucanía", "Los Ríos", "Los Lagos",  "Aysén del General Carlos Ibáñez del Campo", 
               "Magallanes y de la Antártica Chilena")
 
-# 1.1.1 Regional data --------
+# Regional data --------
 
 # Population data to estimate incidence rates
 pop <- rio::import(paste0(input, "estimaciones-y-proyecciones-2002-2035-comunas.xlsx")) |> clean_names()
@@ -187,7 +187,7 @@ pop_reg |>
 
 save(pop_reg, file=paste0(output, "Population_region_2011_2024", ".RData"))
 
-# 1.1.2 Municipality data --------
+# Municipality data --------
 
 # Calculate municipality population by summing over municipalities, then reshape to long format
 pop_mun <- pop |> 
@@ -253,15 +253,15 @@ pop_mun |>
 save(pop_mun, file=paste0(output, "Population_municipality_2011_2024", ".RData"))
 
 ############################################################################################################################/
-# 1.2 Foodborne Diseases Data ----------------------------------------------------------------
+# 2.1.2 Foodborne Diseases Data ----------------------------------------------------------------
 ############################################################################################################################/
 
-# 1.2.1 Load data --------
+# Load data --------
 
 fd <- rio::import(paste0(input, "Brotes_ETA_2011_2024.xlsx")) |> clean_names()
 glimpse(fd)
 
-# 1.2.2 Edit variables --------
+# Edit variables --------
 
 # Adjust municipality data 
 com <- chilemapas::codigos_territoriales |> 
