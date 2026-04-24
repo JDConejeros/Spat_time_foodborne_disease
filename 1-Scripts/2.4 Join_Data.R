@@ -24,9 +24,9 @@ population_reg <- rio::import(paste0(output, "Population_region_2011_2024", ".RD
   select(-c(region, geometry)) |> 
   rename(pop_reg = pop)
 
-era5 <- rio::import(paste0(output, "ERA5_climate_2011_2024", ".RData")) |> 
-  select(!name_com) |> 
-  mutate(date = as.Date(date))
+era5 <- rio::import(paste0(output, "ERA5_climate_2011_2024", ".RData")) |>
+  dplyr::select(!name_com) |>
+  dplyr::mutate(date = lubridate::as_date(date))
 
 ############################################################################################################################/
 # 2.4.2 Daily Data ----------------------------------------------------------------
@@ -201,6 +201,8 @@ clim_precip_vars <- c(
   "total_precipitation_sum", "total_precipitation_min", "total_precipitation_max"
 )
 clim_vars <- c(clim_temp_vars, clim_precip_vars)
+# Daily climate anomalies (mean deviation vs commune × ISO week climatology, 2011–2024)
+clim_dev_vars <- c("t_des_media", "t_des_min", "t_des_max", "p_des")
 epi_sum_vars <- c(
   "expoused", "sick", "dead", "hosp",
   "n_sick_1_14", "n_sick_15_44", "n_sick_45_64", "n_sick_65"
@@ -280,81 +282,145 @@ d_clim_day <- d_nosf |>
     pop_reg
   )
 
-# Global percentiles: full series, unique municipality–date daily values
-q2m <- stats::quantile(d_clim_day$temperature_2m, c(0.9, 0.95, 0.99), na.rm = TRUE, type = 7)
-q2mmin <- stats::quantile(
-  d_clim_day$temperature_2m_min, c(0.9, 0.95, 0.99), na.rm = TRUE, type = 7
-)
-q2mmax <- stats::quantile(
-  d_clim_day$temperature_2m_max, c(0.9, 0.95, 0.99), na.rm = TRUE, type = 7
-)
-
-qpsum <- stats::quantile(
-  d_clim_day$total_precipitation_sum, c(0.9, 0.95, 0.99), na.rm = TRUE, type = 7
-)
-qpmin <- stats::quantile(
-  d_clim_day$total_precipitation_min, c(0.9, 0.95, 0.99), na.rm = TRUE, type = 7
-)
-qpmax <- stats::quantile(
-  d_clim_day$total_precipitation_max, c(0.9, 0.95, 0.99), na.rm = TRUE, type = 7
-)
-
-# Day exceeds threshold (1 = one day); series: tmean, tmin, tmax; then psum, pmin, pmax
-d_clim_day <- d_clim_day |>
+# Commune–year–ISO week stats for CSI (inter-annual mean/SD of weekly values, 2011–2024)
+wk_annual <- d_clim_day |>
   dplyr::mutate(
+    iso_w = lubridate::isoweek(consumption_date),
+    yr = lubridate::year(consumption_date)
+  ) |>
+  dplyr::group_by(cod_mun, yr, iso_w) |>
+  dplyr::summarise(
+    t_mean_wk = mean(temperature_2m, na.rm = TRUE),
+    t_max_wk = mean(temperature_2m_max, na.rm = TRUE),
+    p_wk = sum(total_precipitation_sum, na.rm = TRUE),
+    .groups = "drop"
+  )
+wk_csi_baseline <- wk_annual |>
+  dplyr::group_by(cod_mun, iso_w) |>
+  dplyr::summarise(
+    csi_t_media_b = mean(t_mean_wk, na.rm = TRUE),
+    csi_t_media_sd = stats::sd(t_mean_wk, na.rm = TRUE),
+    csi_t_max_b = mean(t_max_wk, na.rm = TRUE),
+    csi_t_max_sd = stats::sd(t_max_wk, na.rm = TRUE),
+    csi_precip_b = mean(p_wk, na.rm = TRUE),
+    csi_precip_sd = stats::sd(p_wk, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Per-commune daily quantiles (full 2011–2024; same distribution for threshold day flags)
+q_mun <- d_clim_day |>
+  dplyr::group_by(cod_mun) |>
+  dplyr::summarise(
+    t2m_q90 = stats::quantile(temperature_2m, 0.9, na.rm = TRUE, type = 7, names = FALSE),
+    t2m_q95 = stats::quantile(temperature_2m, 0.95, na.rm = TRUE, type = 7, names = FALSE),
+    t2m_q99 = stats::quantile(temperature_2m, 0.99, na.rm = TRUE, type = 7, names = FALSE),
+    tmin_q90 = stats::quantile(temperature_2m_min, 0.9, na.rm = TRUE, type = 7, names = FALSE),
+    tmin_q95 = stats::quantile(temperature_2m_min, 0.95, na.rm = TRUE, type = 7, names = FALSE),
+    tmin_q99 = stats::quantile(temperature_2m_min, 0.99, na.rm = TRUE, type = 7, names = FALSE),
+    tmax_q90 = stats::quantile(temperature_2m_max, 0.9, na.rm = TRUE, type = 7, names = FALSE),
+    tmax_q95 = stats::quantile(temperature_2m_max, 0.95, na.rm = TRUE, type = 7, names = FALSE),
+    tmax_q99 = stats::quantile(temperature_2m_max, 0.99, na.rm = TRUE, type = 7, names = FALSE),
+    psum_q90 = stats::quantile(total_precipitation_sum, 0.9, na.rm = TRUE, type = 7, names = FALSE),
+    psum_q95 = stats::quantile(total_precipitation_sum, 0.95, na.rm = TRUE, type = 7, names = FALSE),
+    psum_q99 = stats::quantile(total_precipitation_sum, 0.99, na.rm = TRUE, type = 7, names = FALSE),
+    pmin_q90 = stats::quantile(total_precipitation_min, 0.9, na.rm = TRUE, type = 7, names = FALSE),
+    pmin_q95 = stats::quantile(total_precipitation_min, 0.95, na.rm = TRUE, type = 7, names = FALSE),
+    pmin_q99 = stats::quantile(total_precipitation_min, 0.99, na.rm = TRUE, type = 7, names = FALSE),
+    pmax_q90 = stats::quantile(total_precipitation_max, 0.9, na.rm = TRUE, type = 7, names = FALSE),
+    pmax_q95 = stats::quantile(total_precipitation_max, 0.95, na.rm = TRUE, type = 7, names = FALSE),
+    pmax_q99 = stats::quantile(total_precipitation_max, 0.99, na.rm = TRUE, type = 7, names = FALSE),
+    .groups = "drop"
+  )
+
+# Commune × ISO week climatology: daily means and SDs (for anomalies t_des_*, p_des)
+baseline_mun_w <- d_clim_day |>
+  dplyr::mutate(iso_w = lubridate::isoweek(consumption_date)) |>
+  dplyr::group_by(cod_mun, iso_w) |>
+  dplyr::summarise(
+    t_media_b = mean(temperature_2m, na.rm = TRUE),
+    t_min_b = mean(temperature_2m_min, na.rm = TRUE),
+    t_max_b = mean(temperature_2m_max, na.rm = TRUE),
+    precip_b = mean(total_precipitation_sum, na.rm = TRUE),
+    t_media_sd = stats::sd(temperature_2m, na.rm = TRUE),
+    t_min_sd = stats::sd(temperature_2m_min, na.rm = TRUE),
+    t_max_sd = stats::sd(temperature_2m_max, na.rm = TRUE),
+    precip_sd = stats::sd(total_precipitation_sum, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Day > commune-specific threshold (1 = one day); then daily anomalies vs clim. same week
+d_clim_day <- d_clim_day |>
+  dplyr::mutate(iso_w = lubridate::isoweek(consumption_date)) |>
+  dplyr::left_join(baseline_mun_w, by = c("cod_mun", "iso_w")) |>
+  dplyr::left_join(q_mun, by = "cod_mun") |>
+  dplyr::mutate(
+    t_des_media = temperature_2m - t_media_b,
+    t_des_min = temperature_2m_min - t_min_b,
+    t_des_max = temperature_2m_max - t_max_b,
+    p_des = total_precipitation_sum - precip_b,
     d_t2m_p90 = as.integer(
-      !is.na(temperature_2m) & !is.na(q2m[[1L]]) & temperature_2m > as.numeric(q2m[[1L]])
+      !is.na(temperature_2m) & !is.na(t2m_q90) & temperature_2m > t2m_q90
     ),
     d_t2m_p95 = as.integer(
-      !is.na(temperature_2m) & !is.na(q2m[[2L]]) & temperature_2m > as.numeric(q2m[[2L]])
+      !is.na(temperature_2m) & !is.na(t2m_q95) & temperature_2m > t2m_q95
     ),
     d_t2m_p99 = as.integer(
-      !is.na(temperature_2m) & !is.na(q2m[[3L]]) & temperature_2m > as.numeric(q2m[[3L]])
+      !is.na(temperature_2m) & !is.na(t2m_q99) & temperature_2m > t2m_q99
     ),
     d_tmin_p90 = as.integer(
-      !is.na(temperature_2m_min) & !is.na(q2mmin[[1L]]) & temperature_2m_min > as.numeric(q2mmin[[1L]])
+      !is.na(temperature_2m_min) & !is.na(tmin_q90) & temperature_2m_min > tmin_q90
     ),
     d_tmin_p95 = as.integer(
-      !is.na(temperature_2m_min) & !is.na(q2mmin[[2L]]) & temperature_2m_min > as.numeric(q2mmin[[2L]])
+      !is.na(temperature_2m_min) & !is.na(tmin_q95) & temperature_2m_min > tmin_q95
     ),
     d_tmin_p99 = as.integer(
-      !is.na(temperature_2m_min) & !is.na(q2mmin[[3L]]) & temperature_2m_min > as.numeric(q2mmin[[3L]])
+      !is.na(temperature_2m_min) & !is.na(tmin_q99) & temperature_2m_min > tmin_q99
     ),
     d_tmax_p90 = as.integer(
-      !is.na(temperature_2m_max) & !is.na(q2mmax[[1L]]) & temperature_2m_max > as.numeric(q2mmax[[1L]])
+      !is.na(temperature_2m_max) & !is.na(tmax_q90) & temperature_2m_max > tmax_q90
     ),
     d_tmax_p95 = as.integer(
-      !is.na(temperature_2m_max) & !is.na(q2mmax[[2L]]) & temperature_2m_max > as.numeric(q2mmax[[2L]])
+      !is.na(temperature_2m_max) & !is.na(tmax_q95) & temperature_2m_max > tmax_q95
     ),
     d_tmax_p99 = as.integer(
-      !is.na(temperature_2m_max) & !is.na(q2mmax[[3L]]) & temperature_2m_max > as.numeric(q2mmax[[3L]])
+      !is.na(temperature_2m_max) & !is.na(tmax_q99) & temperature_2m_max > tmax_q99
     ),
     d_psum_p90 = as.integer(
-      !is.na(total_precipitation_sum) & !is.na(qpsum[[1L]]) & total_precipitation_sum > as.numeric(qpsum[[1L]])
+      !is.na(total_precipitation_sum) & !is.na(psum_q90) & total_precipitation_sum > psum_q90
     ),
     d_psum_p95 = as.integer(
-      !is.na(total_precipitation_sum) & !is.na(qpsum[[2L]]) & total_precipitation_sum > as.numeric(qpsum[[2L]])
+      !is.na(total_precipitation_sum) & !is.na(psum_q95) & total_precipitation_sum > psum_q95
     ),
     d_psum_p99 = as.integer(
-      !is.na(total_precipitation_sum) & !is.na(qpsum[[3L]]) & total_precipitation_sum > as.numeric(qpsum[[3L]])
+      !is.na(total_precipitation_sum) & !is.na(psum_q99) & total_precipitation_sum > psum_q99
     ),
     d_pmin_p90 = as.integer(
-      !is.na(total_precipitation_min) & !is.na(qpmin[[1L]]) & total_precipitation_min > as.numeric(qpmin[[1L]])
+      !is.na(total_precipitation_min) & !is.na(pmin_q90) & total_precipitation_min > pmin_q90
     ),
     d_pmin_p95 = as.integer(
-      !is.na(total_precipitation_min) & !is.na(qpmin[[2L]]) & total_precipitation_min > as.numeric(qpmin[[2L]])
+      !is.na(total_precipitation_min) & !is.na(pmin_q95) & total_precipitation_min > pmin_q95
     ),
     d_pmin_p99 = as.integer(
-      !is.na(total_precipitation_min) & !is.na(qpmin[[3L]]) & total_precipitation_min > as.numeric(qpmin[[3L]])
+      !is.na(total_precipitation_min) & !is.na(pmin_q99) & total_precipitation_min > pmin_q99
     ),
     d_pmax_p90 = as.integer(
-      !is.na(total_precipitation_max) & !is.na(qpmax[[1L]]) & total_precipitation_max > as.numeric(qpmax[[1L]])
+      !is.na(total_precipitation_max) & !is.na(pmax_q90) & total_precipitation_max > pmax_q90
     ),
     d_pmax_p95 = as.integer(
-      !is.na(total_precipitation_max) & !is.na(qpmax[[2L]]) & total_precipitation_max > as.numeric(qpmax[[2L]])
+      !is.na(total_precipitation_max) & !is.na(pmax_q95) & total_precipitation_max > pmax_q95
     ),
     d_pmax_p99 = as.integer(
-      !is.na(total_precipitation_max) & !is.na(qpmax[[3L]]) & total_precipitation_max > as.numeric(qpmax[[3L]])
+      !is.na(total_precipitation_max) & !is.na(pmax_q99) & total_precipitation_max > pmax_q99
+    )
+  ) |>
+  dplyr::select(
+    -dplyr::all_of(
+      c(
+        "t_media_b", "t_min_b", "t_max_b", "precip_b", "t_media_sd", "t_min_sd", "t_max_sd",
+        "precip_sd", "iso_w",
+        "t2m_q90", "t2m_q95", "t2m_q99", "tmin_q90", "tmin_q95", "tmin_q99", "tmax_q90", "tmax_q95", "tmax_q99",
+        "psum_q90", "psum_q95", "psum_q99", "pmin_q90", "pmin_q95", "pmin_q99", "pmax_q90", "pmax_q95", "pmax_q99"
+      )
     )
   )
 
@@ -390,6 +456,10 @@ aggregate_panel <- function(d_ep, d_clim, gvars) {
       n_pmax_p90 = sum(d_pmax_p90, na.rm = TRUE),
       n_pmax_p95 = sum(d_pmax_p95, na.rm = TRUE),
       n_pmax_p99 = sum(d_pmax_p99, na.rm = TRUE),
+      t_des_media = mean(t_des_media, na.rm = TRUE),
+      t_des_min = mean(t_des_min, na.rm = TRUE),
+      t_des_max = mean(t_des_max, na.rm = TRUE),
+      p_des = mean(p_des, na.rm = TRUE),
       pop_mun = dplyr::first(pop_mun),
       pop_reg = dplyr::first(pop_reg),
       .groups = "drop"
@@ -460,6 +530,10 @@ aggregate_panel <- function(d_ep, d_clim, gvars) {
       dplyr::across(
         dplyr::all_of(clim_precip_vars),
         ~ dplyr::if_else(is.nan(.x), NA_real_, .x)
+      ),
+      dplyr::across(
+        dplyr::all_of(clim_dev_vars),
+        ~ dplyr::if_else(is.nan(.x), NA_real_, .x)
       )
     )
   out
@@ -520,10 +594,34 @@ data_month <- aggregate_panel(d_nosf, d_clim_day, g_month) |>
   sf::st_as_sf()
 glimpse(data_month)
 
-## By epidemiological week (epiweek, ISO week starting Monday) + rates ------
+## By epidemiological week (epiweek, ISO week starting Monday) + rates + CSI ------
 g_week <- c(geo_base, "epiweek")
 data_w <- aggregate_panel(d_nosf, d_clim_day, g_week) |>
+  dplyr::mutate(iso_w = lubridate::isoweek(epiweek)) |>
+  dplyr::left_join(wk_csi_baseline, by = c("cod_mun", "iso_w")) |>
   dplyr::mutate(
+    delta_t_media = temperature_2m - csi_t_media_b,
+    delta_t_max = temperature_2m_max - csi_t_max_b,
+    delta_precip = total_precipitation_sum - csi_precip_b,
+    z_t_media = dplyr::if_else(
+      !is.na(csi_t_media_sd) & csi_t_media_sd > 0,
+      delta_t_media / csi_t_media_sd,
+      NA_real_
+    ),
+    z_t_max = dplyr::if_else(
+      !is.na(csi_t_max_sd) & csi_t_max_sd > 0,
+      delta_t_max / csi_t_max_sd,
+      NA_real_
+    ),
+    # z_precip > 0 = more rain than normal; stress index uses (-z_precip)
+    z_precip = dplyr::if_else(
+      !is.na(csi_precip_sd) & csi_precip_sd > 0,
+      delta_precip / csi_precip_sd,
+      NA_real_
+    ),
+    CSI_v1 = z_t_media + (-z_precip),
+    CSI_v2 = z_t_max + (-z_precip),
+    CSI_v3 = ((z_t_media + z_t_max) / 2) + (-z_precip),
     rate_atack = dplyr::if_else(expoused > 0, sick / expoused, NA_real_),
     rate_dead = dplyr::if_else(expoused > 0, dead / expoused, NA_real_),
     rate_hosp = dplyr::if_else(expoused > 0, hosp / expoused, NA_real_)

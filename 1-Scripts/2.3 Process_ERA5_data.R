@@ -50,9 +50,10 @@ unique(test$name_com) # 5 municipalities with NA values for temperature_2m, but 
 #  "Antartica"      "Isla de Pascua" "Juan Fernandez" "Puqueldon"      "Quinchao"  
 remove_mun <- unique(test$mun) # 12202  5201  5104 10206 10210
 
-era5_clean <- era5_clean |> 
-  filter(!mun %in% remove_mun)
+era5_clean <- era5_clean |>
+  dplyr::filter(!mun %in% remove_mun) |>
+  dplyr::mutate(date = lubridate::as_date(date))
 
 # Save data -------
-save(era5_clean, file=paste0(output, "ERA5_climate_2011_2024", ".RData"))
+save(era5_clean, file = paste0(output, "ERA5_climate_2011_2024", ".RData"))
 
