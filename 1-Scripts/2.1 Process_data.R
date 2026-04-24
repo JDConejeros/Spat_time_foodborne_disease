@@ -1,113 +1,25 @@
-# Process data -----
+# 1.0 Process data Foodborne diseases data -----
+
 # Load settings
-source("Code/00 Settings.R")
-source("Code/01 Mapping_vars.R")
+source("Code/0.1 Settings.R")
+source("Code/0.2 Packages.R")
+source("Code/0.3 Functions.R")
+source("Code/0.4 Mapping_vars.R")
 
-############################################################################################################################/
-# 1. Prepare data ----------------------------------------------------------------
-############################################################################################################################/
+# Paths 
+input <- "02-Data/Input/"
+output <- "02-Data/Output/"
 
-pob <- rio::import("Data/estimaciones-y-proyecciones-2002-2035-comunas.xlsx") |> clean_names()
-eta_cases <- rio::import("Data/Brotes_ETA_2011_2024.xlsx") |> clean_names()
+# 1.1 Load data ----------------------------------------------------------------
 
-# Descriptive glimpse
-glimpse(pob)
-glimpse(eta_cases)
-glimpse(tmax)
-glimpse(tmin)
+# Population data to estimate incidence rates
+pop <- rio::import("Data/estimaciones-y-proyecciones-2002-2035-comunas.xlsx") |> clean_names()
+glimpse(pop)
 
-############################################################################################################################/
-# 2. Temp data ----------------------------------------------------------------
-############################################################################################################################/
+# Foodborne diseases data
+eta <- rio::import("Data/Brotes_ETA_2011_2024.xlsx") |> clean_names()
+glimpse(eta)
 
-# Adjust long data and time tmax
-metadata <- tmax[1:4, 4:ncol(tmax)] |>
-  t() |>
-  as.data.frame() |>
-  rename(com = `1`, lat = `2`, long = `3`, sup = `4`) 
-
-temp <-  tmax[-(2:4), ] |> 
-  row_to_names(row_number = 1) |> 
-  clean_names() |> 
-  rename("year"="x9999", 
-         "month"="x9999_2",
-         "day"="x9999_3") |> 
-  pivot_longer(cols = starts_with("x"), 
-               names_to = "com", 
-               values_to = "tmax") |> 
-  mutate(com=str_remove(com, "x"),
-         com=as.numeric(com))
-
-tmax <- temp |> 
-  left_join(metadata, by="com")
-
-tmax <- tmax |>
-    mutate(
-      date = as.Date(paste(year, month, day, sep = "-")),
-      year_month = format(date, "%m-%Y")
-    )
-
-glimpse(tmax)
-
-# Adjust long data and time tmin
-metadata <- tmin[1:4, 4:ncol(tmin)] |>
-  t() |>
-  as.data.frame() |>
-  rename(com = `1`, lat = `2`, long = `3`, sup = `4`) 
-
-temp <-  tmin[-(2:4), ] |> 
-  row_to_names(row_number = 1) |> 
-  clean_names() |> 
-  rename("year"="x9999", 
-         "month"="x9999_2",
-         "day"="x9999_3") |> 
-  pivot_longer(cols = starts_with("x"), 
-               names_to = "com", 
-               values_to = "tmin") |> 
-  mutate(com=str_remove(com, "x"),
-         com=as.numeric(com))
-
-tmin <- temp |> 
-  left_join(metadata, by="com")
-
-tmin <- tmin |> 
-    mutate(
-      date = as.Date(paste(year, month, day, sep = "-")),
-      year_month = format(date, "%m-%Y")
-    )
-
-glimpse(tmin)
-
-# Add regional codes 
-com <- chilemapas::codigos_territoriales |> 
-  mutate(nombre_comuna=stringr::str_to_title(nombre_comuna)) |> 
-  select(1:2) |> 
-  mutate(codigo_comuna=as.numeric(codigo_comuna)) |> 
-  rename(name_com="nombre_comuna")
-
-tmax <- tmax |> 
-  left_join(com, by=c("com"="codigo_comuna"))
-
-tmax <- tmax |> 
-  relocate(com, name_com, lat, long, sup, date, year_month)
-
-tmin <- tmin |> 
-  select(com, year, month, day, tmin)
-
-temp <- tmax |> 
-  left_join(tmin, by=c("com", "year", "month", "day"))
-
-glimpse(temp)
-
-rm(metadata, tmin, tmax)
-
-# Mean temperatura: mean distance 
-temp <- temp |>
-  mutate(tmean = rowMeans(cbind(tmin, tmax), na.rm = TRUE))
-
-glimpse(temp)
-
-save(temp, file=paste0("Data/", "Temp_data_1980_2021", ".RData"))
 
 ############################################################################################################################/
 # 3. Population Data ----------------------------------------------------------------
