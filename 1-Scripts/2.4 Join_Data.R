@@ -224,49 +224,10 @@ d_nosf <- if (inherits(data, "sf")) {
   data
 }
 
-# Categorical levels: 1 per event row; multiple events on the same day are summed in aggregation
-lev_source_food <- c(
-  "Eggs", "Meat and meat products", "Milk and milk products", "Not determined",
-  "Other food", "Ready to eat", "Seafood", "Water"
-)
-lev_source_place <- c(
-  "Not determined", "Place not authorized or only for sale",
-  "Place of production and/or consumption", "Place of self-consumption"
-)
-lev_type_diagnosis <- c(
-  "Bacillus cereus", "Bacterium not classified", "Campylobacter spp.",
-  "Chemical toxins", "Clostridium spp.", "Escherichia coli", "Listeria spp.",
-  "Parasites", "Salmonella spp.", "Seafood toxins", "Shigella spp.",
-  "Staphylococcus aureus", "Vibrio spp.", "Viruses", "Yersinia spp."
-)
-lev_group_diagnosis <- c("Bacteria", "Chemical agents", "Parasites", "Viruses")
+# Categorical levels: 1 per event row; levels + dummies: 1.3 Functions.R
+d_nosf <- add_fbd_event_dummies(d_nosf, remove_source_vars = TRUE)
 
-add_event_indicators_by_levels <- function(df, col, ref_levels, prefix) {
-  if (!col %in% names(df)) {
-    return(df)
-  }
-  levs <- unique(c(ref_levels, as.character(na.omit(df[[col]]))))
-  for (a in levs) {
-    nm <- paste0(prefix, "_", janitor::make_clean_names(a))
-    df[[nm]] <- as.integer(!is.na(df[[col]]) & df[[col]] == a)
-  }
-  df
-}
-
-d_nosf <- d_nosf |>
-  add_event_indicators_by_levels("source_food", lev_source_food, "food") |>
-  add_event_indicators_by_levels("source_place", lev_source_place, "place") |>
-  add_event_indicators_by_levels("type_diagnosis", lev_type_diagnosis, "type") |>
-  add_event_indicators_by_levels("group_diagnosis", lev_group_diagnosis, "group") |>
-  dplyr::select(-dplyr::all_of(
-    c("source_food", "source_place", "type_diagnosis", "group_diagnosis")
-  ))
-
-ind_epi_cat_vars <- grep(
-  "^(food|place|type|group)_",
-  names(d_nosf),
-  value = TRUE
-)
+ind_epi_cat_vars <- fbd_ind_epi_cat_var_names(d_nosf)
 
 # One row per municipality and day (climate); no duplicate days: thresholds and temperature means
 d_clim_day <- d_nosf |>

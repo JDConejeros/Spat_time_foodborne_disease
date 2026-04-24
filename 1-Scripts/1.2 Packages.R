@@ -14,8 +14,9 @@ install_load <- function(packages){
 
 # Grouped by purpose, then passed to install_load
 pkgs_io <- c(
-  "rio",   # import/export (many formats)
-  "readr" # fast read/write for delimited text
+  "rio",      # import/export (many formats)
+  "readr",    # fast read/write for delimited text
+  "openxlsx"  # multi-sheet Excel
 )
 
 pkgs_wrangle <- c(
